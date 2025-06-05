@@ -78,7 +78,7 @@ const defaultPDFOptions = {
   preferCSSPageSize: true,
   displayHeaderFooter: false,
   omitBackground: true,
-  scale: 0.8
+  scale: 1
 };
 
 async function generatePDF(html, options = {}) {
