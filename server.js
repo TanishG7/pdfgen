@@ -3,8 +3,9 @@ const compression = require('compression');
 const helmet = require('helmet');
 const cors = require('cors');
 const path = require('path');
-const { generatePDF, initializeBrowser, closeBrowser } = require('./pdf-generator');
+const { generatePDF, closeBrowser } = require('./pdf-generator');
 const logger = require('./logger');
+
 
 // Load HTML template as string
 
@@ -12,11 +13,14 @@ const logger = require('./logger');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use('/assets', express.static(path.join(__dirname, 'assets'), {
-  setHeaders: (res, path) => {
-    logger.info(`Serving static file: ${path}`);
-  }
-}));
+app.use('/assets', express.static(path.join(__dirname, 'assets')));
+
+
+// app.use('/assets', express.static(path.join(__dirname, 'assets'), {
+//   setHeaders: (res, path) => {
+//     logger.info(`Serving static file: ${path}`);
+//   }
+// }));
 
 // Middleware
 app.use(helmet());
@@ -34,8 +38,7 @@ app.use((req, res, next) => {
 });
 
 // Sample HTML template for testing (if Priya's HTML is not available)
-const sampleHTML = `
-<!DOCTYPE html>
+const sampleHTML = `<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
@@ -44,6 +47,7 @@ const sampleHTML = `
    .red-color {
        color: red;
    }
+    
 </style>
 <section style="margin:0 auto;width:98%;">
    <table BORDER="0" CELLPADDING="0" CELLSPACING="0"
@@ -98,18 +102,85 @@ const sampleHTML = `
    </TABLE>
 
 
-   <div style="height:auto;background:url(./images/approved.jpg) top center no-repeat;">
-       <table BORDER="0" CELLPADDING="0" CELLSPACING="0"
-           style="border-collapse:collapse;border:1px solid #dddddd; width:100%;margin-top:10px;font-family: arial, sans-serif;font-size:11px;color:#231f20;line-height:18px;">
-           <tr style="background:#e9e9e9;color:#000;text-align:center">
-               <th style="padding:2px 5px;border:1px solid #dddddd;font-weight:600;text-align:center" width="10%">S.No.
-               </th>
-               <th style="padding:2px 5px;border:1px solid #dddddd;font-weight:600;text-align:center" width="80%">
-                   Description</th>
-               <th style="padding:2px 5px;border:1px solid #dddddd;font-weight:600;text-align:center" width="10%">
-                   Amount (INR)</th>
-           </tr>
-       </table>
+   <div style="height:auto;background:url(/assets/approved.jpg) top center no-repeat;">
+        <table border="0" cellspacing="0" cellpadding="0" style="border-collapse: collapse; border: 1px solid #dddddd; width: 100%; font-family: Arial, sans-serif; font-size: 12px; color: #231f20; line-height: 18px;">
+    <thead style="background: #e9e9e9; color: #000;">
+        <tr style="text-align: center;">
+            <th style="padding: 8px; border: 1px solid #dddddd;">S.No.</th>
+            <th style="padding: 8px; border: 1px solid #dddddd;">Description</th>
+            <th style="padding: 8px; border: 1px solid #dddddd;">Amount (INR)</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td style="padding: 8px; border: 1px solid #dddddd; text-align: center;">1.</td>
+            <td style="padding: 8px; border: 1px solid #dddddd;">
+                <strong>Service:</strong> LS20<br>
+                <strong>No. of Combination:</strong> 20<br>
+                <strong>Duration:</strong> 1 Year<br>
+                <strong>Offer Applied:</strong> 1 Month Extra on Old Leader Renewals
+            </td>
+            <td style="padding: 8px; border: 1px solid #dddddd; text-align: center;">4,21,200.00</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px; border: 1px solid #dddddd; text-align: center;">2.</td>
+            <td style="padding: 8px; border: 1px solid #dddddd;">Trust Seal <strong>(Complimentary)</strong></td>
+            <td style="padding: 8px; border: 1px solid #dddddd; text-align: center;">0.00</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px; border: 1px solid #dddddd; text-align: center;">3.</td>
+            <td style="padding: 8px; border: 1px solid #dddddd;">India BuyLeads <strong>(Complimentary):</strong> 70 <strong>(Weekly)</strong> + 3 <strong>(Daily Bonus)</strong></td>
+            <td style="padding: 8px; border: 1px solid #dddddd; text-align: center;">0.00</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px; border: 1px solid #dddddd; text-align: center;">4.</td>
+            <td style="padding: 8px; border: 1px solid #dddddd;">Offers Applied: 10% Cashback on 1 Lac+ Deals</td>
+            <td style="padding: 8px; border: 1px solid #dddddd; text-align: center;">0.00</td>
+        </tr>
+
+        <!-- S.No 5 merged across 6 rows -->
+        <tr>
+            <td rowspan="6" style="padding: 8px; border: 1px solid #dddddd; text-align: center; vertical-align: middle;"></td>
+            <td style="padding: 8px; border: 1px solid #dddddd; text-align: right;">Total Price</td>
+            <td style="padding: 8px; border: 1px solid #dddddd; text-align: center;">4,21,200.00</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px; border: 1px solid #dddddd; text-align: right;">Discount @ 3.85%</td>
+            <td style="padding: 8px; border: 1px solid #dddddd; text-align: center;">(-)16,200.00</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px; border: 1px solid #dddddd; text-align: right;">Deal Amount</td>
+            <td style="padding: 8px; border: 1px solid #dddddd; text-align: center;">4,05,000.00</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px; border: 1px solid #dddddd; text-align: right;">Deal Amount (Inc. GST)</td>
+            <td style="padding: 8px; border: 1px solid #dddddd; text-align: center;">4,77,900.00</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px; border: 1px solid #dddddd; text-align: right;">IGST @ 18%</td>
+            <td style="padding: 8px; border: 1px solid #dddddd; text-align: center;">72,900.00</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px; border: 1px solid #dddddd; text-align: right; font-weight: bold;">Total Payable Amount</td>
+            <td style="padding: 8px; border: 1px solid #dddddd; text-align: center;">4,77,900.00</td>
+        </tr>
+
+        <!-- Installment rows -->
+        <tr>
+            <td colspan="2" style="padding: 8px; border: 1px solid #dddddd; text-align: right;">Advance Payment</td>
+            <td style="padding: 8px; border: 1px solid #dddddd; text-align: center;">Day 0 – 1,70,900.00</td>
+        </tr>
+        <tr>
+            <td colspan="2" style="padding: 8px; border: 1px solid #dddddd; text-align: right;">1st Installment Payment</td>
+            <td style="padding: 8px; border: 1px solid #dddddd; text-align: center;">Day 30 – 1,53,500.00</td>
+        </tr>
+        <tr>
+            <td colspan="2" style="padding: 8px; border: 1px solid #dddddd; text-align: right;">2nd Installment Payment</td>
+            <td style="padding: 8px; border: 1px solid #dddddd; text-align: center;">Day 60 – 1,53,500.00</td>
+        </tr>
+    </tbody>
+</table>
+
    </div>
    <table BORDER="0" CELLPADDING="0" CELLSPACING="0"
        style="border-collapse:collapse;width:100%; margin-top:40px;font-family: arial, sans-serif;font-size:11px;color:#231f20;line-height:18px;">
@@ -185,7 +256,6 @@ const sampleHTML = `
        </TR>
    </TABLE>
 </section>
-<div style="page-break-after: always;"></div>
 <section style="margin:0 auto;width:100%;">
    <table BORDER="0" CELLPADDING="0" CELLSPACING="0" style="border-collapse:collapse;width:100%;margin:120px 0 5px 0">
        <TR>
@@ -705,8 +775,8 @@ const sampleHTML = `
    </TABLE>
 </section>
 </body>
-</html>
-`;
+</html>`
+;
 
 // Helper function to replace template variables
 function replaceTemplateVariables(html, data) {
@@ -900,7 +970,6 @@ process.on('SIGTERM', async () => {
 // Initialize browser and start server
 async function startServer() {
   try {
-    await initializeBrowser();
     app.listen(PORT, () => {
       logger.info(`PDF Generator API started on port ${PORT}`);
       console.log(`🚀 Server running on http://localhost:${PORT}`);

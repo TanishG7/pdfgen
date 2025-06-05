@@ -1,274 +1,183 @@
 const puppeteer = require('puppeteer');
 const logger = require('./logger');
+const GenericPool = require('generic-pool');
 
+const MAX_POOL_SIZE = process.env.PDF_POOL_SIZE || 5;
+const PAGE_POOL_SIZE = process.env.PAGE_POOL_SIZE || 10;
+const IDLE_TIMEOUT_MS = 30000;
 
-let browser = null;
-let isInitializing = false;
-
-// Performance-optimized browser configuration
 const browserConfig = {
   headless: true,
   args: [
     '--no-sandbox',
     '--disable-setuid-sandbox',
     '--disable-dev-shm-usage',
-    '--disable-accelerated-2d-canvas',
+    '--disable-gpu',
     '--no-first-run',
     '--no-zygote',
-    '--disable-gpu',
-    '--disable-background-timer-throttling',
     '--disable-backgrounding-occluded-windows',
     '--disable-renderer-backgrounding',
-    '--disable-features=TranslateUI',
+    '--disable-features=TranslateUI,VizDisplayCompositor',
     '--disable-web-security',
-    '--disable-features=VizDisplayCompositor'
+    '--disable-software-rasterizer',
+    '--disable-font-subpixel-positioning',
+    '--disable-lcd-text',
+    '--font-render-hinting=none'
   ],
-  defaultViewport: {
-    width: 1200,
-    height: 800
-  }
+  defaultViewport: { width: 1200, height: 800 }
 };
 
-// PDF generation options optimized for speed
+const browserPool = GenericPool.createPool({
+  create: async () => {
+    logger.info('Creating browser instance');
+    const browser = await puppeteer.launch(browserConfig);
+    const warmupPage = await browser.newPage();
+    await warmupPage.close();
+    return browser;
+  },
+  destroy: async browser => {
+    try {
+      await browser.close();
+      logger.info('Browser closed');
+    } catch (error) {
+      logger.warn('Error closing browser', { error: error.message });
+    }
+  },
+  validate: browser => Promise.resolve(browser.isConnected())
+}, {
+  max: MAX_POOL_SIZE,
+  min: 1,
+  idleTimeoutMillis: IDLE_TIMEOUT_MS,
+  evictionRunIntervalMillis: 10000
+});
+
+const createPagePool = browser => GenericPool.createPool({
+  create: async () => {
+    const page = await browser.newPage();
+    await page.setExtraHTTPHeaders({ 'Accept-Language': 'en-US,en;q=0.9' });
+    return page;
+  },
+  destroy: async page => {
+    try {
+      await page.close();
+    } catch (error) {
+      logger.warn('Error closing page', { error: error.message });
+    }
+  },
+  validate: page => Promise.resolve(!page.isClosed())
+}, {
+  max: PAGE_POOL_SIZE,
+  min: 1,
+  idleTimeoutMillis: IDLE_TIMEOUT_MS
+});
+
 const defaultPDFOptions = {
   format: 'A4',
   printBackground: true,
-  margin: {
-    top: '20px',
-    right: '20px',
-    bottom: '20px',
-    left: '20px'
-  },
+  margin: { top: '20px', right: '20px', bottom: '20px', left: '20px' },
   preferCSSPageSize: true,
-  displayHeaderFooter: false
+  displayHeaderFooter: false,
+  omitBackground: true,
+  scale: 0.8
 };
 
-/**
- * Initialize browser instance with connection pooling
- */
-async function initializeBrowser() {
-  if (browser && browser.connected) {
-    return browser;
-  }
-  
-  if (isInitializing) {
-    // Wait for initialization to complete
-    while (isInitializing) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-    return browser;
-  }
-  
-  isInitializing = true;
-  
-  try {
-    logger.info('Initializing Puppeteer browser...');
-    const startTime = Date.now();
-    
-    browser = await puppeteer.launch(browserConfig);
-    
-    const initTime = Date.now() - startTime;
-    logger.info(`Browser initialized in ${initTime}ms`);
-    
-    // Pre-warm the browser by creating and closing a page
-    const warmupPage = await browser.newPage();
-    await warmupPage.close();
-    
-    return browser;
-  } catch (error) {
-    logger.error('Failed to initialize browser', { error: error.message });
-    throw error;
-  } finally {
-    isInitializing = false;
-  }
-}
-
-/**
- * Generate PDF from HTML with optimized performance
- */
 async function generatePDF(html, options = {}) {
   const startTime = Date.now();
-  let page = null;
-  
+  let browser, pagePool, page;
+
   try {
-    // Ensure browser is initialized
-    if (!browser || !browser.connected) {
-      await initializeBrowser();
-    }
-    
-    // Create new page
-    const pageStartTime = Date.now();
-    page = await browser.newPage();
-    
-    // Optimize page settings for performance
-    await page.setExtraHTTPHeaders({
-      'Accept-Language': 'en-US,en;q=0.9'
-    });
-    
-    // FIXED: Removed problematic request interception that was blocking resources
-    // For inline CSS/HTML content, we don't need to block external resources
-    // since everything is self-contained in the HTML string
-    
-    const pageCreationTime = Date.now() - pageStartTime;
-    
-    // Set HTML content
-    const contentStartTime = Date.now();
+    browser = await browserPool.acquire();
+    pagePool = createPagePool(browser);
+    page = await pagePool.acquire();
+
+    await page.emulateMediaType('screen');
+
+
     await page.setContent(html, {
-       waitUntil: ['load', 'domcontentloaded'], // Wait for network to be idle for better rendering
-      timeout: 60000 // Increased timeout
+      waitUntil: 'domcontentloaded',
+      timeout: 10000
     });
 
     await page.waitForSelector('body', { timeout: 30000 });
 
-    await page.evaluate(async () => {
-      await new Promise((resolve) => {
-        if (document.readyState === 'complete') {
-          resolve();
-        } else {
-          window.addEventListener('load', resolve);
-        }
-      });
-    });
-    const contentLoadTime = Date.now() - contentStartTime;
-    
-    // Wait a bit more to ensure styles are fully applied
-    await new Promise(resolve => setTimeout(resolve, 500));
+    const pdfBuffer = await page.pdf({ ...defaultPDFOptions, ...options });
 
-    
-    // Merge PDF options
-    const pdfOptions = { ...defaultPDFOptions, ...options };
-    
-    // Generate PDF
-    const pdfStartTime = Date.now();
-    const pdfBuffer = await page.pdf(pdfOptions);
-    const pdfGenerationTime = Date.now() - pdfStartTime;
-    
-    const totalTime = Date.now() - startTime;
-    
-    logger.info('PDF generation performance metrics', {
-      pageCreation: `${pageCreationTime}ms`,
-      contentLoad: `${contentLoadTime}ms`,
-      pdfGeneration: `${pdfGenerationTime}ms`,
-      totalTime: `${totalTime}ms`,
+    logger.info('PDF generated', {
+      totalTime: `${Date.now() - startTime}ms`,
       pdfSize: `${Math.round(pdfBuffer.length / 1024)}KB`
     });
-    
+
     return pdfBuffer;
-    
   } catch (error) {
-    const errorTime = Date.now() - startTime;
     logger.error('PDF generation failed', {
       error: error.message,
-      timeToError: `${errorTime}ms`,
+      timeToError: `${Date.now() - startTime}ms`,
       stack: error.stack
     });
     throw error;
   } finally {
-    // Always close the page to free resources
-    if (page) {
-      try {
-        await page.close();
-      } catch (closeError) {
-        logger.warn('Failed to close page', { error: closeError.message });
-      }
-    }
+    if (pagePool && page) await pagePool.release(page).catch(async err => {
+      logger.warn('Failed to release page', { error: err.message });
+      try { await page.close(); } catch (_) {}
+    });
+
+    if (browser) await browserPool.release(browser).catch(async err => {
+      logger.warn('Failed to release browser', { error: err.message });
+      try { await browser.close(); } catch (_) {}
+    });
   }
 }
 
-/**
- * Generate PDF from HTML with external resource control (for cases with external resources)
- */
 async function generatePDFWithResourceControl(html, options = {}) {
   const startTime = Date.now();
-  let page = null;
-  
+  let browser, page;
+
   try {
-    // Ensure browser is initialized
-    if (!browser || !browser.connected) {
-      await initializeBrowser();
-    }
-    
-    // Create new page
+    browser = await browserPool.acquire();
     page = await browser.newPage();
-    
-    // Set up request interception for external resources
+
     await page.setRequestInterception(true);
-    page.on('request', (req) => {
-      const resourceType = req.resourceType();
+    page.on('request', req => {
+      const type = req.resourceType();
       const url = req.url();
-      
-      // Allow data URLs and inline content
-      if (url.startsWith('data:') || url.startsWith('about:')) {
-        req.continue();
-        return;
-      }
-      
-      // Block external images, scripts, and other non-essential resources
-      if (['image', 'media', 'websocket', 'manifest'].includes(resourceType)) {
-        req.abort('blockedbyclient');
-      } else {
-        req.continue();
-      }
+      if (url.startsWith('data:') || url.startsWith('about:')) return req.continue();
+      if (['image', 'media', 'websocket', 'manifest'].includes(type)) req.abort();
+      else req.continue();
     });
-    
-    // Set HTML content
-    await page.setContent(html, {
-      waitUntil: 'domcontentloaded',
-      timeout: 15000
-    });
-    
-    // Wait for any remaining processing
+
+    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 15000 });
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    
-    // Generate PDF
-    const pdfOptions = { ...defaultPDFOptions, ...options };
-    const pdfBuffer = await page.pdf(pdfOptions);
-    
-    const totalTime = Date.now() - startTime;
+    const pdfBuffer = await page.pdf({ ...defaultPDFOptions, ...options });
+
     logger.info('PDF with resource control generated', {
-      totalTime: `${totalTime}ms`,
+      totalTime: `${Date.now() - startTime}ms`,
       pdfSize: `${Math.round(pdfBuffer.length / 1024)}KB`
     });
-    
+
     return pdfBuffer;
-    
   } catch (error) {
-    const errorTime = Date.now() - startTime;
-    logger.error('PDF generation with resource control failed', {
+    logger.error('Resource-controlled PDF generation failed', {
       error: error.message,
-      timeToError: `${errorTime}ms`,
+      timeToError: `${Date.now() - startTime}ms`,
       stack: error.stack
     });
     throw error;
   } finally {
-    if (page) {
-      try {
-        await page.close();
-      } catch (closeError) {
-        logger.warn('Failed to close page', { error: closeError.message });
-      }
-    }
+    if (page) await page.close().catch(err => logger.warn('Failed to close page', { error: err.message }));
+    if (browser) await browserPool.release(browser).catch(err => logger.warn('Failed to release browser', { error: err.message }));
   }
 }
 
-/**
- * Generate multiple PDFs concurrently (for high-throughput scenarios)
- */
 async function generatePDFBatch(htmlArray, options = {}) {
   const startTime = Date.now();
-  
   try {
-    const promises = htmlArray.map(html => generatePDF(html, options));
-    const results = await Promise.all(promises);
-    
-    const totalTime = Date.now() - startTime;
-    logger.info(`Batch PDF generation completed`, {
+    const results = await Promise.all(htmlArray.map(html => generatePDF(html, options)));
+    logger.info('Batch PDF generation completed', {
       count: htmlArray.length,
-      totalTime: `${totalTime}ms`,
-      avgTime: `${Math.round(totalTime / htmlArray.length)}ms`
+      totalTime: `${Date.now() - startTime}ms`,
+      avgTime: `${Math.round((Date.now() - startTime) / htmlArray.length)}ms`
     });
-    
     return results;
   } catch (error) {
     logger.error('Batch PDF generation failed', { error: error.message });
@@ -276,73 +185,45 @@ async function generatePDFBatch(htmlArray, options = {}) {
   }
 }
 
-/**
- * Get browser status for monitoring
- */
-async function getBrowserStatus() {
-  try {
-    if (!browser) {
-      return { connected: false, pages: 0 };
-    }
-    
-    const pages = await browser.pages();
-    return {
-      connected: browser.connected,
-      pages: pages.length,
-      wsEndpoint: browser.wsEndpoint()
-    };
-  } catch (error) {
-    return { connected: false, error: error.message };
-  }
+function getBrowserStatus() {
+  return {
+    size: browserPool.size,
+    available: browserPool.available,
+    borrowed: browserPool.borrowed,
+    pending: browserPool.pending,
+    max: browserPool.max,
+    min: browserPool.min
+  };
 }
 
-/**
- * Close browser and cleanup resources
- */
+
 async function closeBrowser() {
-  if (browser) {
-    try {
-      await browser.close();
-      logger.info('Browser closed successfully');
-    } catch (error) {
-      logger.error('Error closing browser', { error: error.message });
-    } finally {
-      browser = null;
-    }
-  }
-}
-
-/**
- * Restart browser if it becomes unresponsive
- */
-async function restartBrowser() {
-  logger.info('Restarting browser...');
-  await closeBrowser();
-  await initializeBrowser();
-}
-
-// Health check for browser
-setInterval(async () => {
   try {
-    if (browser && browser.connected) {
-      const pages = await browser.pages();
-      if (pages.length > 10) { // Too many open pages, restart browser
-        logger.warn(`Too many open pages (${pages.length}), restarting browser`);
-        await restartBrowser();
-      }
-    }
+    await browserPool.drain();
+    await browserPool.clear();
+    logger.info('Browser pool drained and cleared');
   } catch (error) {
-    logger.warn('Browser health check failed', { error: error.message });
-    await restartBrowser();
+    logger.error('Error closing browser pool', { error: error.message });
   }
-}, 60000); // Check every minute
+}
+
+setInterval(async () => {
+   const stats = {
+    size: browserPool.size,
+    available: browserPool.available,
+    borrowed: browserPool.borrowed,
+    pending: browserPool.pending
+  };
+  logger.info('Browser pool status', stats);
+  if (stats.borrowed > 0 && stats.available === 0 && stats.pending > 0) {
+    logger.warn('Potential pool starvation detected', stats);
+  }
+}, 30000);
 
 module.exports = {
   generatePDF,
   generatePDFWithResourceControl,
   generatePDFBatch,
-  initializeBrowser,
-  closeBrowser,
-  restartBrowser,
-  getBrowserStatus
+  getBrowserStatus,
+  closeBrowser
 };
