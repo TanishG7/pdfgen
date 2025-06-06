@@ -128,75 +128,6 @@ async function generatePDF(html, options = {}) {
   }
 }
 
-async function generatePDFWithResourceControl(html, options = {}) {
-  const startTime = Date.now();
-  let browser, page;
-
-  try {
-    browser = await browserPool.acquire();
-    page = await browser.newPage();
-
-    await page.setRequestInterception(true);
-    page.on('request', req => {
-      const type = req.resourceType();
-      const url = req.url();
-      if (url.startsWith('data:') || url.startsWith('about:')) return req.continue();
-      if (['image', 'media', 'websocket', 'manifest'].includes(type)) req.abort();
-      else req.continue();
-    });
-
-    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 15000 });
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    const pdfBuffer = await page.pdf({ ...defaultPDFOptions, ...options });
-
-    logger.info('PDF with resource control generated', {
-      totalTime: `${Date.now() - startTime}ms`,
-      pdfSize: `${Math.round(pdfBuffer.length / 1024)}KB`
-    });
-
-    return pdfBuffer;
-  } catch (error) {
-    logger.error('Resource-controlled PDF generation failed', {
-      error: error.message,
-      timeToError: `${Date.now() - startTime}ms`,
-      stack: error.stack
-    });
-    throw error;
-  } finally {
-    if (page) await page.close().catch(err => logger.warn('Failed to close page', { error: err.message }));
-    if (browser) await browserPool.release(browser).catch(err => logger.warn('Failed to release browser', { error: err.message }));
-  }
-}
-
-async function generatePDFBatch(htmlArray, options = {}) {
-  const startTime = Date.now();
-  try {
-    const results = await Promise.all(htmlArray.map(html => generatePDF(html, options)));
-    logger.info('Batch PDF generation completed', {
-      count: htmlArray.length,
-      totalTime: `${Date.now() - startTime}ms`,
-      avgTime: `${Math.round((Date.now() - startTime) / htmlArray.length)}ms`
-    });
-    return results;
-  } catch (error) {
-    logger.error('Batch PDF generation failed', { error: error.message });
-    throw error;
-  }
-}
-
-function getBrowserStatus() {
-  return {
-    size: browserPool.size,
-    available: browserPool.available,
-    borrowed: browserPool.borrowed,
-    pending: browserPool.pending,
-    max: browserPool.max,
-    min: browserPool.min
-  };
-}
-
-
 async function closeBrowser() {
   try {
     await browserPool.drain();
@@ -222,8 +153,5 @@ setInterval(async () => {
 
 module.exports = {
   generatePDF,
-  generatePDFWithResourceControl,
-  generatePDFBatch,
-  getBrowserStatus,
   closeBrowser
 };

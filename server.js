@@ -5,39 +5,24 @@ const cors = require('cors');
 const path = require('path');
 const { generatePDF, closeBrowser } = require('./pdf-generator');
 const logger = require('./logger');
-
-
-// Load HTML template as string
-
+const { Buffer } = require('buffer');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use('/assets', express.static(path.join(__dirname, 'assets')));
 
-
-// app.use('/assets', express.static(path.join(__dirname, 'assets'), {
-//   setHeaders: (res, path) => {
-//     logger.info(`Serving static file: ${path}`);
-//   }
-// }));
-
-// Middleware
 app.use(helmet());
 app.use(compression());
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-app.use('/assets', express.static(path.join(__dirname, 'assets')));
-
-// Request timing middleware
 app.use((req, res, next) => {
   req.startTime = Date.now();
   next();
 });
 
-// Sample HTML template for testing (if Priya's HTML is not available)
 const sampleHTML = `<!DOCTYPE html>
 <html>
 <head>
@@ -778,88 +763,59 @@ const sampleHTML = `<!DOCTYPE html>
 </html>`
 ;
 
-// Helper function to replace template variables
-function replaceTemplateVariables(html, data) {
-  let processedHtml = html;
-  Object.keys(data).forEach(key => {
-    const regex = new RegExp(`{{${key}}}`, 'g');
-    processedHtml = processedHtml.replace(regex, data[key] || '');
-  });
-  return processedHtml;
-}
-
-// Routes
 app.post('/generate-pdf', async (req, res) => {
-  const startTime = Date.now();
+  const requestStart = Date.now();
   
   try {
-    const { html, data, options = {} } = req.body;
-    
-    // Use provided HTML or sample HTML
-    let htmlContent = html || sampleHTML;
-    
-    // Replace template variables if data is provided
-    if (data) {
-      htmlContent = replaceTemplateVariables(htmlContent, data);
-    } else {
-      // Use sample data for testing
-      const sampleData = {
-        projectName: "PDF Generation Optimization Project",
-        projectId: "PROJ-2025-001",
-        approvalDate: new Date().toLocaleDateString(),
-        budget: "$50,000",
-        projectDescription: "This project aims to optimize PDF generation performance to achieve sub-1-second response times using Node.js, Puppeteer, and Docker containerization.",
-        planningStart: "2025-06-01",
-        planningEnd: "2025-06-15",
-        devStart: "2025-06-16",
-        devEnd: "2025-07-30",
-        testStart: "2025-08-01",
-        testEnd: "2025-08-15",
-        generatedDate: new Date().toLocaleString()
-      };
-      
-      htmlContent = replaceTemplateVariables(htmlContent, sampleData);
+    const { htmlBase64,  modId, source, empId} = req.body;
+
+    if (!htmlBase64) {
+      throw new Error('Base64 encoded HTML content is missing');
     }
     
-    logger.info('Starting PDF generation', {
-      htmlLength: htmlContent.length,
-      hasCustomData: !!data
-    });
+    let html;
+    try {
+      html = Buffer.from(htmlBase64, 'base64').toString('utf-8');
+    } catch (err) {
+      throw new Error('Invalid base64 encoded HTML');
+    }
+
+    if (!html || html.trim().length === 0) {
+      throw new Error('Decoded HTML content is empty');
+    }
     
-    const pdfBuffer = await generatePDF(htmlContent, options);
-    const generationTime = Date.now() - startTime;
+    const pdfBuffer = await generatePDF(html);
+    const requestEnd = Date.now();
+    const generationTime =`${requestEnd - requestStart}ms`;
+
+    const logData = {
+      requestStartTime: new Date(requestStart).toISOString(),
+      requestEndTime: new Date(requestEnd).toISOString(),
+      pdfGenerationTime: generationTime,
+      modId: modId || 'unknown',
+      source: source || 'unknown',
+      empId: empId || 'unknown',
+      pdfSize: `${Math.round(pdfBuffer.length / 1024)}KB`,
+      htmlSnippet: html.substring(0, 100)
+    };
     
-    logger.info('PDF generated successfully', {
-      generationTime: `${generationTime}ms`,
-      pdfSize: `${Math.round(pdfBuffer.length / 1024)}KB`
-    });
-    
-    res.set({
-      'Content-Type': 'application/pdf',
-      'Content-Length': pdfBuffer.length,
-      'X-Generation-Time': `${generationTime}ms`,
-      'Content-Disposition': 'attachment; filename="approved-proposal.pdf"'
-    });
-    
+    logger.info('PDF generated successfully', logData);
+
+    res.setHeader('Content-Type', 'application/pdf');
     res.send(pdfBuffer);
-    
-  } catch (error) {
-    const errorTime = Date.now() - startTime;
+  } catch (err) {
     logger.error('PDF generation failed', {
-      error: error.message,
-      timeToError: `${errorTime}ms`,
-      stack: error.stack
+      error: err.message,
+      timeToError: `${Date.now() - requestStart}ms`
     });
-    
     res.status(500).json({
       error: 'PDF generation failed',
-      message: error.message,
-      timeToError: `${errorTime}ms`
+      message: err.message,
+      timeToError: `${Date.now() - requestStart}ms`
     });
   }
 });
 
-// Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
@@ -868,7 +824,6 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Performance metrics endpoint
 app.get('/metrics', (req, res) => {
   const used = process.memoryUsage();
   res.json({
@@ -884,37 +839,12 @@ app.get('/metrics', (req, res) => {
   });
 });
 
-// Fixed sample endpoint to test with sample data
 app.get('/generate-sample-pdf', async (req, res) => {
   const startTime = Date.now();
   
   try {
-//     Define sample data
-//     const sampleData = {
-//       projectName: 'Sample Project for Testing',
-//       projectId: 'SAMPLE-001',
-//       approvalDate: new Date().toLocaleDateString(),
-//       budget: '$25,000',
-//       projectDescription: 'This is a sample project created specifically for testing PDF generation functionality. It demonstrates the complete workflow from HTML template processing to PDF output.',
-//       planningStart: '2025-06-01',
-//       planningEnd: '2025-06-15',
-//       devStart: '2025-06-16',
-//       devEnd: '2025-07-30',
-//       testStart: '2025-08-01',
-//       testEnd: '2025-08-15',
-//       generatedDate: new Date().toLocaleString()
-//     };
-    
-//     // Process the HTML template with sample data
-//     const processedHtml = replaceTemplateVariables(sampleHTML, sampleData);
-    
-//     logger.info('Generating sample PDF', {
-//       htmlLength: processedHtml.length
-//     });
-    
-    // Generate PDF
     const pdfBuffer = await generatePDF(sampleHTML, {
-      timeout: 60000 // 60 seconds timeout
+      timeout: 60000
     });
     const generationTime = Date.now() - startTime;
     
@@ -923,7 +853,6 @@ app.get('/generate-sample-pdf', async (req, res) => {
       pdfSize: `${Math.round(pdfBuffer.length / 1024)}KB`
     });
     
-    // Set proper headers
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Length': pdfBuffer.length,
@@ -948,13 +877,11 @@ app.get('/generate-sample-pdf', async (req, res) => {
   }
 });
 
-// Error handling middleware
 app.use((err, req, res, next) => {
   logger.error('Unhandled error', { error: err.message, stack: err.stack });
   res.status(500).json({ error: 'Internal server error' });
 });
 
-// Graceful shutdown
 process.on('SIGINT', async () => {
   logger.info('Received SIGINT, shutting down gracefully...');
   await closeBrowser();
@@ -967,15 +894,14 @@ process.on('SIGTERM', async () => {
   process.exit(0);
 });
 
-// Initialize browser and start server
 async function startServer() {
   try {
     app.listen(PORT, () => {
       logger.info(`PDF Generator API started on port ${PORT}`);
-      console.log(`🚀 Server running on http://localhost:${PORT}`);
-      console.log(`📄 Test PDF generation: http://localhost:${PORT}/generate-sample-pdf`);
-      console.log(`💚 Health check: http://localhost:${PORT}/health`);
-      console.log(`📊 Metrics: http://localhost:${PORT}/metrics`);
+      console.log(`Server running on http://localhost:${PORT}`);
+      console.log(`Test PDF generation: http://localhost:${PORT}/generate-sample-pdf`);
+      console.log(`Health check: http://localhost:${PORT}/health`);
+      console.log(`Metrics: http://localhost:${PORT}/metrics`);
     });
   } catch (error) {
     logger.error('Failed to start server', { error: error.message });
