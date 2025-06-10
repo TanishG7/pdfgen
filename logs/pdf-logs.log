@@ -593,3 +593,44 @@
 [2025-06-06T08:23:30.572Z] INFO: Browser closed 
 [2025-06-06T08:23:50.491Z] INFO: Browser pool status {"size":1,"available":1,"borrowed":0,"pending":0}
 [2025-06-06T08:23:55.592Z] INFO: Received SIGINT, shutting down gracefully... 
+[2025-06-10T05:52:11.441Z] INFO: Creating browser instance 
+[2025-06-10T05:52:11.449Z] INFO: PDF Generator API started on port 3000 
+[2025-06-10T05:52:18.994Z] INFO: PDF generated {"totalTime":"130ms","pdfSize":"255KB"}
+[2025-06-10T05:52:18.994Z] INFO: Sample PDF generated successfully {"generationTime":"130ms","pdfSize":"255KB"}
+[2025-06-10T05:52:38.591Z] INFO: PDF generated {"totalTime":"111ms","pdfSize":"255KB"}
+[2025-06-10T05:52:38.592Z] INFO: PDF generated successfully {"requestStartTime":"2025-06-10T05:52:38.480Z","requestEndTime":"2025-06-10T05:52:38.592Z","pdfGenerationTime":"112ms","modId":"test123","source":"postman","empId":"11181","pdfSize":"255KB","htmlSnippet":"<!DOCTYPE html>\n<html>\n<head>\n    <meta charset=\"UTF-8\">\n    <title>Approved Proposal</title>\n    <s"}
+[2025-06-10T05:52:41.446Z] INFO: Browser pool status {"size":1,"available":1,"borrowed":0,"pending":0}
+[2025-06-10T05:55:24.586Z] INFO: Creating browser instance 
+[2025-06-10T05:55:24.591Z] INFO: Browser pool status {"size":1,"available":0,"borrowed":0,"pending":0}
+[2025-06-10T05:55:54.604Z] INFO: Browser pool status {"size":1,"available":1,"borrowed":0,"pending":0}
+[2025-06-10T05:56:04.609Z] INFO: Creating browser instance 
+[2025-06-10T05:56:04.649Z] INFO: Browser closed 
+[2025-06-10T05:56:24.608Z] INFO: Browser pool status {"size":1,"available":1,"borrowed":0,"pending":0}
+[2025-06-10T05:56:44.616Z] INFO: Creating browser instance 
+[2025-06-10T05:56:44.639Z] INFO: Browser closed 
+[2025-06-10T05:56:54.608Z] INFO: Browser pool status {"size":1,"available":1,"borrowed":0,"pending":0}
+[2025-06-10T05:57:24.610Z] INFO: Browser pool status {"size":1,"available":1,"borrowed":0,"pending":0}
+[2025-06-10T05:57:24.626Z] INFO: Creating browser instance 
+[2025-06-10T05:57:24.652Z] INFO: Browser closed 
+[2025-06-10T05:57:54.611Z] INFO: Browser pool status {"size":1,"available":1,"borrowed":0,"pending":0}
+[2025-06-10T05:58:04.634Z] INFO: Creating browser instance 
+[2025-06-10T05:58:04.659Z] INFO: Browser closed 
+[2025-06-10T05:58:24.610Z] INFO: Browser pool status {"size":1,"available":1,"borrowed":0,"pending":0}
+[2025-06-10T05:58:24.622Z] INFO: Browser closed 
+[2025-06-10T05:58:44.642Z] INFO: Creating browser instance 
+[2025-06-10T05:58:44.666Z] INFO: Browser closed 
+[2025-06-10T05:58:54.611Z] INFO: Browser pool status {"size":1,"available":1,"borrowed":0,"pending":0}
+[2025-06-10T05:59:24.612Z] INFO: Browser pool status {"size":1,"available":1,"borrowed":0,"pending":0}
+[2025-06-10T05:59:24.648Z] INFO: Creating browser instance 
+[2025-06-10T05:59:24.663Z] INFO: Browser closed 
+[2025-06-10T05:59:54.614Z] INFO: Browser pool status {"size":1,"available":1,"borrowed":0,"pending":0}
+[2025-06-10T06:00:04.656Z] INFO: Creating browser instance 
+[2025-06-10T06:00:04.682Z] INFO: Browser closed 
+[2025-06-10T06:00:24.615Z] INFO: Browser pool status {"size":1,"available":1,"borrowed":0,"pending":0}
+[2025-06-10T06:00:44.667Z] INFO: Creating browser instance 
+[2025-06-10T06:00:44.688Z] INFO: Browser closed 
+[2025-06-10T06:00:54.616Z] INFO: Browser pool status {"size":1,"available":1,"borrowed":0,"pending":0}
+[2025-06-10T06:01:24.617Z] INFO: Browser pool status {"size":1,"available":1,"borrowed":0,"pending":0}
+[2025-06-10T06:01:24.676Z] INFO: Creating browser instance 
+[2025-06-10T06:01:24.700Z] INFO: Browser closed 
+[2025-06-10T06:01:26.702Z] INFO: Received SIGINT, shutting down gracefully... 

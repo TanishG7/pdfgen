@@ -43,7 +43,7 @@ const browserPool = GenericPool.createPool({
       logger.warn('Error closing browser', { error: error.message });
     }
   },
-  validate: browser => Promise.resolve(browser.isConnected())
+  validate: browser => Promise.resolve(browser.Connected())
 }, {
   max: MAX_POOL_SIZE,
   min: 1,
