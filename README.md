@@ -13,7 +13,7 @@
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 | Component       | Technology |
 |-----------------|------------|
 | Core Framework  | Express.js |
@@ -24,7 +24,7 @@
 | Compression     | compression|
 
 
-## 🔄 Workflow Flowchart
+## Workflow Flowchart
 
 ```mermaid
 flowchart TD
