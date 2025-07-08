@@ -1,6 +1,5 @@
 # HTML-to-PDF Generation Microservice
 
-![PDF Generation Workflow](https://via.placeholder.com/1024x400?text=HTML+to+PDF+with+Storage+Integration)  
 *A high-performance service for converting HTML to PDF with direct cloud storage upload.*
 
 ---
