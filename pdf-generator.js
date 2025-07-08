@@ -7,7 +7,7 @@ const PAGE_POOL_SIZE = process.env.PAGE_POOL_SIZE || 10;
 const IDLE_TIMEOUT_MS = 30000;
 
 const browserConfig = {
-  headless: true,
+  headless: "true",
   args: [
     '--no-sandbox',
     '--disable-setuid-sandbox',

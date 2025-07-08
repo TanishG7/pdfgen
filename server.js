@@ -6,6 +6,8 @@ const path = require('path');
 const { generatePDF, closeBrowser } = require('./pdf-generator');
 const logger = require('./logger');
 const { Buffer } = require('buffer');
+const FormData = require('form-data');
+const axios = require('axios');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -762,6 +764,72 @@ const sampleHTML = `<!DOCTYPE html>
 </body>
 </html>`
 ;
+
+app.post('/generate-and-upload', async (req, res) => {
+  const requestStart = Date.now();
+
+  try {
+    const {
+      htmlBase64,
+      AK,
+      USR_ID,
+      IMAGE_TYPE,
+      UPLOADED_BY,
+      MODID,
+    } = req.body;
+
+    if (!htmlBase64) {
+      return res.status(400).json({ error: 'Base64 encoded HTML content is required' });
+    }
+
+    const html = Buffer.from(htmlBase64, 'base64').toString('utf-8');
+
+    const pdfBuffer = await generatePDF(html);
+    const pdfendTime = Date.now();
+    logger.info('PDF generated for second API', {
+      pdfSize: `${Math.round(pdfBuffer.length / 1024)}KB`,
+    });
+
+    const form = new FormData();
+    form.append('AK', AK);
+    form.append('USR_ID', USR_ID);
+    form.append('IMAGE_TYPE', IMAGE_TYPE);
+    form.append('UPLOADED_BY', UPLOADED_BY);
+    form.append('MODID', MODID);
+    form.append('IMAGE', pdfBuffer, {
+      filename: 'generated.pdf',
+      contentType: 'application/pdf',
+    });
+
+    const secondApiUrl = 'http://dev-uploading.imimg.com/uploadimage';
+    const secondApiResponse = await axios.post(secondApiUrl, form, {
+      headers: {
+        ...form.getHeaders(),
+      },
+    });
+    logger.info('Successfully uploaded PDF to second API');
+
+    res.json({
+      success: true,
+      secondApiResponse: secondApiResponse.data,
+      pdfSize: `${Math.round(pdfBuffer.length / 1024)}KB`,
+      generationTime: `${pdfendTime - requestStart}ms`,
+      uploadTime: `${Date.now() - pdfendTime}ms`,
+      totalTime: `${Date.now() - requestStart}ms`,
+    });
+  } catch (error) {
+    logger.error('Error in generate-and-upload route', {
+      error: error.message,
+      stack: error.stack,
+      timeToError: `${Date.now() - requestStart}ms`,
+    });
+    res.status(500).json({
+      error: 'Generation and upload failed',
+      message: error.message,
+    });
+  }
+});
+
 
 app.post('/generate-pdf', async (req, res) => {
   const requestStart = Date.now();
